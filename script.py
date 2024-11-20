@@ -1,8 +1,6 @@
 import math as m
 import numpy as np
 import scipy.optimize as o
-import pandas as pd
-import matplotlib.pyplot as plt
 from pprint import pprint 
 
 ### PARAM: Initial player or pearl position
@@ -24,7 +22,6 @@ def v_0(axis:str, pitch:float) -> float:
         "y": -1.5 * m.sin(pitch),
         "z": 1.5 * m.cos(pitch)
     }[axis]
-
 
 ### Component-wise velocity function given a pitch and axis, initial pitch, and time. We keep yaw constant at 360 degrees
 def v(t:int, axis:str, pitch:float) -> float:
@@ -48,26 +45,23 @@ def s(t:int, axis:str, pitch:float) -> float:
 def helper_s_y(t:int, pitch:float) -> float:
     return s(t, "y", pitch) - (s_y0 - (1.62-0.1))
 
-
 ### Compute when the pearl hits the ground, ASSUMING the landing spot is level with the player's standing spot 
 # upper bound seems to be at least 90 ticks, as produced by angle -89 to -84 (angle -83 produced 89 ticks). Hence, 300 as an upper bound on root-finding is more than enough.  
 def compute_landing_time(pitch:float) -> float:
     return m.floor(o.root_scalar(helper_s_y, args=(pitch), bracket=[0, 300], method="bisect").root)
 
 ### Convert a given pitch to its significant angle equivalent
-# I observed that the raw pitch always gets rounded up to the higher significant angle: -45 is exactly a signif angle, and you can test -45.00001 and -44.99999 -- the former achieves 51.425 and latter achieves 51.430. Crazy!
+# I observed that the raw pitch always gets rounded up to the lower significant angle: -45 is exactly a signif angle, and you can test -45.00001 and -44.99999 -- the former achieves 51.425 and latter achieves 51.430. Crazy!
 def convert_pitch(pitch:float) -> float:
-    return m.ceil(pitch / (360/65536)) * 360/65536 
+    return m.floor(pitch / (360/65536)) * 360/65536 
 
 landing_times = {}
 landing_distances = {}
-desired_angles = np.arange(-50, -30+1)
+desired_angles = np.arange(-90, 90, 360/65536)
 for pitch in desired_angles:
     converted_pitch = convert_pitch(pitch)
-    landing_times[pitch] = compute_landing_time(converted_pitch)
+    landing_times[converted_pitch] = compute_landing_time(converted_pitch)
     landing_distances[pitch] = s(landing_times[pitch], "z", converted_pitch)
 
-#pprint(landing_times)
-pprint(landing_distances)
-df = pd.DataFrame(landing_distances.items(), columns=['Angle', 'Distance'])
-df.to_csv('C:/Users/vluon/Desktop/Math and Science/minecraft ender pearl simulations/output.csv', index=False)
+top_entries = dict(sorted(landing_distances.items(), key=lambda item: item[1], reverse=True)[:10])
+pprint(top_entries)
